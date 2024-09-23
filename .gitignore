@@ -1,0 +1,9 @@
+scripts
+target
+*.md
+!README.md
+.DS_Store
+*-workspace
+.snfoundry_cache/
+tmp/*
+snfoundry.toml

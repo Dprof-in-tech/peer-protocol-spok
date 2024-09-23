@@ -1,0 +1,33 @@
+[package]
+name = "glasses"
+version = "0.1.0"
+edition = "2024_07"
+author = "Milan Cermak"
+description = "Nouns Glasses NFT"
+license = "MIT"
+keywords = ["nft", "nouns"]
+
+[[target.starknet-contract]]
+
+[dependencies]
+starknet = "2.8.2"
+openzeppelin = "0.16.0"
+
+[dev-dependencies]
+snforge_std = "0.30.0"
+
+[scripts]
+test = "snforge test"
+declare = "sncast --profile sepolia declare --fee-token eth --contract-name nft"
+deploy = "sncast --profile sepolia deploy --fee-token eth --class-hash"
+upgrade = "sncast --profile sepolia invoke --fee-token eth --contract-address $NFT_ADDY --function upgrade --calldata"
+
+[tool.fmt]
+max-line-length = 120
+sort-module-level-items = true
+
+[profile.sepolia]
+inherits = "release"
+
+[profile.mainnet]
+inherits = "release"
