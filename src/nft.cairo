@@ -1,6 +1,9 @@
+use starknet::{ContractAddress};
+
 #[starknet::interface]
 pub trait IMintable<TContractState> {
-    fn mint(ref self: TContractState);
+    fn mint(ref self: TContractState, reciever_Address: ContractAddress, unique_id: u256, proposal_id: u256);
+    fn update_peer_protocol_address(ref self: TContractState, new_address: ContractAddress); 
 }
 
 #[starknet::contract]
@@ -33,13 +36,16 @@ mod nft {
         erc721: ERC721Component::Storage,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
-
+        owner: ContractAddress,
         // keeps track of the last minted token ID
         latest_token_id: u128,
         // mapping from token ID to minter's address
         // we use the minter's address to generate the token,
         // so even if the NFT is transferred, its appearance remains
-        token_minter: Map<u128, ContractAddress>
+        token_minter: Map<u128, ContractAddress>,
+        peer_protocol_address: ContractAddress,
+        token_unique_id: u256,
+        proposal_id: u256,
     }
 
     #[event]
@@ -52,11 +58,13 @@ mod nft {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState) {
+    fn constructor(ref self: ContractState, owner: ContractAddress, peer_protocol_address: ContractAddress) {
         // not calling self.erc721.initializer as we implement the metadata interface ourselves,
         // just registering the interface with SRC5 component
         self.src5.register_interface(IERC721_ID);
         self.src5.register_interface(IERC721_METADATA_ID);
+        self.owner.write(owner);
+        self.peer_protocol_address.write(peer_protocol_address);
     }
 
     fn generate_random_id(address: ContractAddress, token_id: u128) -> ByteArray {
@@ -79,11 +87,11 @@ mod nft {
 
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
             assert(token_id <= self.latest_token_id.read().into(), 'Token ID does not exist');
-            let minter = self.token_minter.read(token_id.low);
-            let random_id = generate_random_id(minter, token_id.low);
+            let random_id = self.token_unique_id.read();
+            let proposal_id = self.proposal_id.read();
             let svg: ByteArray = build_svg(self.token_minter.read(token_id.low));
             format!(
-                "data:application/json,{{\"name\":\"Peer Spok #{random_id}\",\"description\":\"P2P spok.\",\"image\":\"data:image/svg+xml,{svg}\"}}"
+                "data:application/json,{{\"name\":\"Peer Spok #{random_id} Proposal {proposal_id}\",\"description\":\"P2P spok.\",\"image\":\"data:image/svg+xml,{svg}\"}}"
             )
         }
     }
@@ -97,14 +105,29 @@ mod nft {
 
     #[abi(embed_v0)]
     impl IMintableImpl of super::IMintable<ContractState> {
-        fn mint(ref self: ContractState) {
+        fn mint(ref self: ContractState,reciever_Address: ContractAddress, unique_id: u256, proposal_id: u256) {
             let token_id = self.latest_token_id.read() + 1;
             self.latest_token_id.write(token_id);
-
-            let minter = get_caller_address();
+            let caller = get_caller_address();
+            assert(caller == self.peer_protocol_address.read(), 'Only protocol can mint');
+            let minter = reciever_Address;
+            self.token_unique_id.write(unique_id);
+            self.proposal_id.write(proposal_id);
             self.token_minter.write(token_id, minter);
 
             self.erc721.mint(minter, token_id.into());
+        }
+
+        fn update_peer_protocol_address(ref self: ContractState, new_address: ContractAddress) {
+            // Check if caller is the current peer protocol address
+            let caller = get_caller_address();
+            assert(
+                caller == self.owner.read(),
+                'Only protocol can update'
+            );
+            
+            // Update the address
+            self.peer_protocol_address.write(new_address);
         }
     }
 
