@@ -59,21 +59,31 @@ mod nft {
         self.src5.register_interface(IERC721_METADATA_ID);
     }
 
+    fn generate_random_id(address: ContractAddress, token_id: u128) -> ByteArray {
+        let minter_felt: felt252 = address.try_into().unwrap();
+        let minter_u256: u256 = minter_felt.into();
+        let token_u256: u256 = token_id.into();
+        let combined = (minter_u256 + token_u256) % 1_u256;
+        format!("{}", combined)
+    }
+
     #[abi(embed_v0)]
     impl ERC721MetadataImpl of IERC721Metadata<ContractState> {
         fn name(self: @ContractState) -> ByteArray {
-            "Nouns Glasses"
+            "Peer Spok"
         }
 
         fn symbol(self: @ContractState) -> ByteArray {
-            "GLASSES"
+            "P2P-SPOK"
         }
 
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
             assert(token_id <= self.latest_token_id.read().into(), 'Token ID does not exist');
+            let minter = self.token_minter.read(token_id.low);
+            let random_id = generate_random_id(minter, token_id.low);
             let svg: ByteArray = build_svg(self.token_minter.read(token_id.low));
             format!(
-                "data:application/json,{{\"name\":\"Nouns Glasses\",\"description\":\"Glasses. Nounish.\",\"image\":\"data:image/svg+xml,{svg}\"}}"
+                "data:application/json,{{\"name\":\"Peer Spok #{random_id}\",\"description\":\"P2P spok.\",\"image\":\"data:image/svg+xml,{svg}\"}}"
             )
         }
     }
@@ -106,10 +116,10 @@ mod nft {
         let h = address.low % 361;
         let s = address.high % 101;
         let l = (address.high.shr(12) % 91) + 5;
-        let rim_color = format!("hsl({h}, {s}%, {l}%)");
+        let circle_color = format!("hsl({h}, {s}%, {l}%)");
 
         format!(
-            "<svg xmlns='http://www.w3.org/2000/svg' version='1.1' width='320' height='320' viewBox='0 0 320 320' shape-rendering='crispEdges'><title>Noun glasses</title><style>rect.f {{ fill: {rim_color}; }}</style><rect width='100%' height='100%' fill='none'></rect><g><rect width='60' height='60' x='100' y='110' class='f'></rect><rect width='60' height='60' x='170' y='110' class='f'></rect><rect width='10' height='10' x='160' y='130' class='f'></rect><rect width='30' height='10' x='70' y='130' class='f'></rect><rect width='10' height='20' x='70' y='140' class='f'></rect><rect width='20' height='40' x='110' y='120' fill='white'></rect><rect width='20' height='40' x='130' y='120' fill='black'></rect><rect width='20' height='40' x='180' y='120' fill='white'></rect><rect width='20' height='40' x='200' y='120' fill='black'></rect></g></svg>"
+            "<svg xmlns='http://www.w3.org/2000/svg' version='1.1' width='320' height='320' viewBox='0 0 320 320'><title>PS Circle</title><circle cx='160' cy='160' r='140' fill='{circle_color}'/><text x='160' y='180' font-family='Arial, sans-serif' font-size='80' font-weight='bold' text-anchor='middle' fill='white'>ps</text></svg>"
         )
     }
 }

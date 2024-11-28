@@ -2,14 +2,6 @@
 version = 1
 
 [[package]]
-name = "glasses"
-version = "0.1.0"
-dependencies = [
- "openzeppelin",
- "snforge_std",
-]
-
-[[package]]
 name = "openzeppelin"
 version = "0.16.0"
 source = "registry+https://scarbs.xyz/"
@@ -105,6 +97,14 @@ name = "openzeppelin_utils"
 version = "0.16.0"
 source = "registry+https://scarbs.xyz/"
 checksum = "sha256:a494aeb5f1371db7f22e922196aa41d1d1698877a766a838350c0b6ffe49fda2"
+
+[[package]]
+name = "peer"
+version = "0.1.0"
+dependencies = [
+ "openzeppelin",
+ "snforge_std",
+]
 
 [[package]]
 name = "snforge_scarb_plugin"

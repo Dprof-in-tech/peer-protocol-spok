@@ -1,5 +1,7 @@
 scripts
 target
+/node_modules
+.env
 *.md
 !README.md
 .DS_Store
@@ -7,3 +9,4 @@ target
 .snfoundry_cache/
 tmp/*
 snfoundry.toml
+package-lock.json

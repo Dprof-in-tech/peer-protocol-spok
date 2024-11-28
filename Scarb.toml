@@ -1,13 +1,15 @@
 [package]
-name = "glasses"
+name = "peer"
 version = "0.1.0"
 edition = "2024_07"
 author = "Milan Cermak"
-description = "Nouns Glasses NFT"
+description = "Peer Protocol Spok NFT"
 license = "MIT"
-keywords = ["nft", "nouns"]
+keywords = ["nft", "peer"]
 
 [[target.starknet-contract]]
+casm = true
+sierra = true
 
 [dependencies]
 starknet = "2.8.2"
