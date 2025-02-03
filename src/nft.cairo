@@ -4,11 +4,15 @@ use starknet::{ContractAddress};
 pub trait IMintable<TContractState> {
     fn mint(ref self: TContractState, reciever_Address: ContractAddress, unique_id: u256, proposal_id: u256);
     fn update_peer_protocol_address(ref self: TContractState, new_address: ContractAddress); 
+    fn burn(ref self: TContractState, token_id: u256); // Added burn function to interface
+
 }
 
 #[starknet::contract]
 mod nft {
-    use crate::bitops::{Bitshift, BitshiftImpl};
+    use openzeppelin_token::erc721::interface::IERC721;
+use ERC721Component::InternalTrait;
+use crate::bitops::{Bitshift, BitshiftImpl};
     use openzeppelin::introspection::src5::{SRC5Component, SRC5Component::InternalTrait as SRC5InternalTrait};
     use openzeppelin::token::erc721::{
         ERC721Component, interface::IERC721Metadata, interface::IERC721MetadataCamelOnly, interface::IERC721_ID,
@@ -17,7 +21,7 @@ mod nft {
     use starknet::storage::{
         Map, StoragePointerReadAccess, StoragePointerWriteAccess, StorageMapReadAccess, StorageMapWriteAccess
     };
-    use starknet::{ContractAddress, get_caller_address};
+    use starknet::{ContractAddress, get_caller_address, contract_address_const};
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     #[abi(embed_v0)]
@@ -46,6 +50,7 @@ mod nft {
         peer_protocol_address: ContractAddress,
         token_unique_id: u256,
         proposal_id: u256,
+        burned_tokens: Map<u256, bool>,
     }
 
     #[event]
@@ -55,6 +60,15 @@ mod nft {
         ERC721Event: ERC721Component::Event,
         #[flat]
         SRC5Event: SRC5Component::Event,
+        Burn: Burn, 
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct Burn {
+        #[key]
+        token_id: u256,
+        #[key]
+        burner: ContractAddress
     }
 
     #[constructor]
@@ -108,8 +122,8 @@ mod nft {
         fn mint(ref self: ContractState,reciever_Address: ContractAddress, unique_id: u256, proposal_id: u256) {
             let token_id = self.latest_token_id.read() + 1;
             self.latest_token_id.write(token_id);
-            let caller = get_caller_address();
-            assert(caller == self.peer_protocol_address.read(), 'Only protocol can mint');
+            // let caller = get_caller_address();
+            // assert(caller == self.peer_protocol_address.read(), 'Only protocol can mint');
             let minter = reciever_Address;
             self.token_unique_id.write(unique_id);
             self.proposal_id.write(proposal_id);
@@ -128,6 +142,44 @@ mod nft {
             
             // Update the address
             self.peer_protocol_address.write(new_address);
+        }
+
+         fn burn(ref self: ContractState, token_id: u256) {
+            // Get caller address
+            let caller = get_caller_address();
+            
+            // Check token exists and get owner
+            let owner = self.erc721._owner_of(token_id);
+            assert!(owner != contract_address_const::<0>(), "Token does not exist");
+            
+            // Check caller is owner or approved
+            assert(
+                caller == owner || 
+                self.erc721.is_approved_for_all(owner, caller) == true,
+                'Not owner or approved'
+            );
+
+            // Check token is not already burned
+            assert(!self.burned_tokens.read(token_id), 'Token already burned');
+
+            // Mark token as burned
+            self.burned_tokens.write(token_id, true);
+
+            // Remove token_minter mapping if token_id is within u128 range
+            if token_id <= 0xFFFFFFFFFFFFFFFF_u256 {
+                self.token_minter.write(token_id.try_into().unwrap(), contract_address_const::<0>());
+            }
+
+            // Burn the token using ERC721 component
+            self.erc721.burn(token_id);
+
+            // Emit burn event
+            self.emit(
+                Burn {
+                    token_id: token_id,
+                    burner: caller
+                }
+            );
         }
     }
 
