@@ -4,7 +4,7 @@ use starknet::{ContractAddress};
 pub trait IMintable<TContractState> {
     fn mint(ref self: TContractState, reciever_Address: ContractAddress, unique_id: u256, proposal_id: u256);
     fn update_peer_protocol_address(ref self: TContractState, new_address: ContractAddress); 
-    fn burn(ref self: TContractState, token_id: u256); // Added burn function to interface
+    fn burn(ref self: TContractState, unique_id: u256); // Added burn function to interface
 
 }
 
@@ -48,7 +48,8 @@ use crate::bitops::{Bitshift, BitshiftImpl};
         // so even if the NFT is transferred, its appearance remains
         token_minter: Map<u128, ContractAddress>,
         peer_protocol_address: ContractAddress,
-        token_unique_id: u256,
+        token_unique_id: Map<u256, u256>,  // Changed to mapping: token_id -> unique_id
+        unique_id_to_token: Map<u256, u256>,
         proposal_id: u256,
         burned_tokens: Map<u256, bool>,
     }
@@ -101,7 +102,7 @@ use crate::bitops::{Bitshift, BitshiftImpl};
 
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
             assert(token_id <= self.latest_token_id.read().into(), 'Token ID does not exist');
-            let random_id = self.token_unique_id.read();
+            let random_id = self.token_unique_id.read(token_id);
             let proposal_id = self.proposal_id.read();
             let svg: ByteArray = build_svg(self.token_minter.read(token_id.low));
             format!(
@@ -125,7 +126,8 @@ use crate::bitops::{Bitshift, BitshiftImpl};
             // let caller = get_caller_address();
             // assert(caller == self.peer_protocol_address.read(), 'Only protocol can mint');
             let minter = reciever_Address;
-            self.token_unique_id.write(unique_id);
+            self.token_unique_id.write(token_id.into(), unique_id);
+            self.unique_id_to_token.write(unique_id, token_id.into());
             self.proposal_id.write(proposal_id);
             self.token_minter.write(token_id, minter);
 
@@ -144,9 +146,10 @@ use crate::bitops::{Bitshift, BitshiftImpl};
             self.peer_protocol_address.write(new_address);
         }
 
-         fn burn(ref self: ContractState, token_id: u256) {
+         fn burn(ref self: ContractState, unique_id: u256) {
             // Get caller address
             let caller = get_caller_address();
+            let token_id = self.unique_id_to_token.read(unique_id);
             
             // Check token exists and get owner
             let owner = self.erc721._owner_of(token_id);
